@@ -291,7 +291,7 @@ int LZ4_decompress_fast(const char *source, char *dest, int originalSize);
  *	or a negative result in case of error
  */
 int LZ4_decompress_safe(const char *source, char *dest, int compressedSize,
-	int maxDecompressedSize);
+	int maxDecompressedSize, bool dip);
 
 /**
  * LZ4_decompress_safe_partial() - Decompress a block of size 'compressedSize'
@@ -319,7 +319,7 @@ int LZ4_decompress_safe(const char *source, char *dest, int compressedSize,
  *
  */
 int LZ4_decompress_safe_partial(const char *source, char *dest,
-	int compressedSize, int targetOutputSize, int maxDecompressedSize);
+	int compressedSize, int targetOutputSize, int maxDecompressedSize, bool dip);
 
 /*-************************************************************************
  *	LZ4 HC Compression

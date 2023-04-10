@@ -3,7 +3,7 @@ use log::{info, warn};
 use std::{collections::HashMap, path::Path};
 
 use crate::{
-    assets, defs, mount,
+    assets, defs, mount, restorecon,
     utils::{self, ensure_clean_dir, ensure_dir_exists},
 };
 
@@ -20,16 +20,10 @@ fn mount_partition(partition: &str, lowerdir: &mut Vec<String>) -> Result<()> {
     }
 
     // handle stock mounts under /partition, we should restore the mount point after overlay
+    // because the overlayfs mount will "overlay" the bind mount such as /vendor/bt_firmware, /vendor/dsp
+    // which will cause the system bootloop or bluetooth/dsp not working
     let stock_mount = mount::StockMount::new(&format!("/{partition}/"))
         .with_context(|| format!("get stock mount of partition: {partition} failed"))?;
-    let result = stock_mount.umount();
-    if result.is_err() {
-        let remount_result = stock_mount.remount();
-        if let Err(e) = remount_result {
-            log::error!("remount stock failed: {:?}", e);
-        }
-        bail!("umount stock mount of failed: {:?}", result);
-    }
 
     // add /partition as the lowerest dir
     let lowest_dir = format!("/{partition}");
@@ -252,7 +246,23 @@ pub fn daemon() -> Result<()> {
 pub fn install() -> Result<()> {
     ensure_dir_exists(defs::ADB_DIR)?;
     std::fs::copy("/proc/self/exe", defs::DAEMON_PATH)?;
-
+    restorecon::setcon(defs::DAEMON_PATH, restorecon::ADB_CON)?;
     // install binary assets
-    assets::ensure_binaries().with_context(|| "Failed to extract assets")
+    assets::ensure_binaries().with_context(|| "Failed to extract assets")?;
+
+    #[cfg(target_os = "android")]
+    link_ksud_to_bin()?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "android")]
+fn link_ksud_to_bin() -> Result<()> {
+    use std::path::PathBuf;
+    let ksu_bin = PathBuf::from(defs::DAEMON_PATH);
+    let ksu_bin_link = PathBuf::from(defs::DAEMON_LINK_PATH);
+    if ksu_bin.exists() && !ksu_bin_link.exists() {
+        std::os::unix::fs::symlink(&ksu_bin, &ksu_bin_link)?;
+    }
+    Ok(())
 }

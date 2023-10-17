@@ -183,6 +183,7 @@ static void cam_isp_ctx_dump_req(struct cam_isp_ctx_req *req_isp)
 				CAM_ERR(CAM_ISP,
 					"Invalid offset exp %u actual %u",
 					req_isp->cfg[i].offset, (uint32_t)len);
+				cam_mem_put_cpu_buf(req_isp->cfg[i].handle);
 				return;
 			}
 			remain_len = len - req_isp->cfg[i].offset;
@@ -193,6 +194,7 @@ static void cam_isp_ctx_dump_req(struct cam_isp_ctx_req *req_isp)
 					"Invalid len exp %u remain_len %u",
 					req_isp->cfg[i].len,
 					(uint32_t)remain_len);
+				cam_mem_put_cpu_buf(req_isp->cfg[i].handle);
 				return;
 			}
 
@@ -3350,6 +3352,7 @@ free_req:
 	list_add_tail(&req->list, &ctx->free_req_list);
 	spin_unlock_bh(&ctx->lock);
 
+	cam_mem_put_cpu_buf((int32_t) cmd->packet_handle);
 	return rc;
 }
 

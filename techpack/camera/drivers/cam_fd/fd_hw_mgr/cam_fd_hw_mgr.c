@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -527,6 +527,33 @@ static int cam_fd_mgr_util_get_buf_map_requirement(uint32_t direction,
 	return 0;
 }
 
+static int cam_fd_mgr_put_cpu_buf(struct cam_hw_prepare_update_args *prepare)
+{
+	int i, rc;
+	uint32_t plane;
+	bool need_io_map, need_cpu_map;
+	struct cam_buf_io_cfg *io_cfg;
+
+	io_cfg = (struct cam_buf_io_cfg *) ((uint8_t *)
+		&prepare->packet->payload + prepare->packet->io_configs_offset);
+
+	if (!io_cfg)
+		return -EINVAL;
+
+	for (i = 0; i < prepare->packet->num_io_configs; i++) {
+		rc = cam_fd_mgr_util_get_buf_map_requirement(
+			io_cfg[i].direction, io_cfg[i].resource_type,
+			&need_io_map, &need_cpu_map);
+
+		if (rc || !need_cpu_map)
+			continue;
+
+		for (plane = 0; plane < CAM_PACKET_MAX_PLANES; plane++)
+			cam_mem_put_cpu_buf(io_cfg[i].mem_handle[plane]);
+	}
+	return 0;
+}
+
 static int cam_fd_mgr_util_prepare_io_buf_info(int32_t iommu_hdl,
 	struct cam_hw_prepare_update_args *prepare,
 	struct cam_fd_hw_io_buffer *input_buf,
@@ -623,6 +650,8 @@ static int cam_fd_mgr_util_prepare_io_buf_info(int32_t iommu_hdl,
 						"Invalid cpu buf %d %d %d",
 						io_cfg[i].direction,
 						io_cfg[i].resource_type, plane);
+					cam_mem_put_cpu_buf(
+						io_cfg[i].mem_handle[plane]);
 					rc = -EINVAL;
 					return rc;
 				}
@@ -1637,7 +1666,7 @@ static int cam_fd_mgr_hw_prepare_update(void *hw_mgr_priv,
 		&prestart_args, &kmd_buf);
 	if (rc) {
 		CAM_ERR(CAM_FD, "Error in hw update entries %d", rc);
-		goto error;
+		goto put_cpu_buf;
 	}
 
 	/* get a free frame req from free list */
@@ -1646,7 +1675,8 @@ static int cam_fd_mgr_hw_prepare_update(void *hw_mgr_priv,
 	if (rc || !frame_req) {
 		CAM_ERR(CAM_FD, "Get frame_req failed, rc=%d, hw_ctx=%pK",
 			rc, hw_ctx);
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto put_cpu_buf;
 	}
 
 	/* Setup frame request info and queue to pending list */
@@ -1661,9 +1691,13 @@ static int cam_fd_mgr_hw_prepare_update(void *hw_mgr_priv,
 	 */
 	prepare->priv = frame_req;
 
+	cam_fd_mgr_put_cpu_buf(prepare);
 	CAM_DBG(CAM_FD, "FramePrepare : Frame[%lld]", frame_req->request_id);
 
 	return 0;
+
+put_cpu_buf:
+	cam_fd_mgr_put_cpu_buf(prepare);
 error:
 	return rc;
 }

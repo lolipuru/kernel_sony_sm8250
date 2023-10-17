@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CCI_DEV_H_
@@ -42,7 +42,7 @@
 #if 1
 #define CCI_TIMEOUT msecs_to_jiffies(50)
 #else
-#define CCI_TIMEOUT msecs_to_jiffies(1500)
+#define CCI_TIMEOUT msecs_to_jiffies(100)
 #endif
 /* sony extension end */
 
@@ -73,6 +73,8 @@
 
 #define PRIORITY_QUEUE (QUEUE_0)
 #define SYNC_QUEUE (QUEUE_1)
+
+#define REPORT_IDSIZE 16
 
 enum cci_i2c_sync {
 	MSM_SYNC_DISABLE,

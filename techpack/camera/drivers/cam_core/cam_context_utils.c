@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/debugfs.h>
@@ -314,6 +315,7 @@ int32_t cam_context_config_dev_to_hw(
 		rc = -EFAULT;
 	}
 
+	cam_mem_put_cpu_buf((int32_t) cmd->packet_handle);
 	return rc;
 }
 
@@ -375,6 +377,7 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 	if ((len < sizeof(struct cam_packet)) ||
 		(cmd->offset >= (len - sizeof(struct cam_packet)))) {
 		CAM_ERR(CAM_CTXT, "Not enough buf");
+		cam_mem_put_cpu_buf((int32_t) cmd->packet_handle);
 		return -EINVAL;
 
 	}
@@ -478,7 +481,7 @@ int32_t cam_context_prepare_dev_to_hw(struct cam_context *ctx,
 				req->in_map_entries[j].sync_id, rc);
 		}
 	}
-
+	cam_mem_put_cpu_buf((int32_t) cmd->packet_handle);
 	return rc;
 put_ctx_ref:
 	for (; j >= 0; j--)
@@ -495,6 +498,7 @@ free_req:
 	req->ctx = NULL;
 	spin_unlock(&ctx->lock);
 
+	cam_mem_put_cpu_buf((int32_t) cmd->packet_handle);
 	return rc;
 }
 
